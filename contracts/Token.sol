@@ -42,6 +42,7 @@ contract Token {
         return true;
     }
 
+    // internal function
     function _transfer(
         address _from,
         address _to,
