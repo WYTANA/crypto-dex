@@ -12,6 +12,13 @@ contract Exchange {
 
     event Deposit(address token, address user, uint256 amount, uint256 balance);
 
+    event Withdraw(
+        address token,
+        address user,
+        uint256 amount,
+        uint256 balance
+    );
+
     constructor(address _feeAccount, uint256 _feePercent) {
         feeAccount = _feeAccount;
         feePercent = _feePercent;
@@ -20,6 +27,7 @@ contract Exchange {
     // Deposit and Withdraw Token
 
     function depositToken(address _token, uint256 _amount) public {
+        // Call token contract
         // Transfer tokens to the exchange
         require(Token(_token).transferFrom(msg.sender, address(this), _amount));
 
@@ -30,7 +38,20 @@ contract Exchange {
         emit Deposit(_token, msg.sender, _amount, tokens[_token][msg.sender]);
     }
 
-    // Check balances with wrapper function
+    function withdrawToken(address _token, uint256 _amount) public {
+        // Require user to have enough tokens to withdraw
+        require(tokens[_token][msg.sender] >= _amount);
+        // Transfer tokens to user
+        Token(_token).transfer(msg.sender, _amount);
+
+        // Update user balance
+        tokens[_token][msg.sender] = tokens[_token][msg.sender] - _amount;
+
+        // Emit an Event
+        emit Withdraw(_token, msg.sender, _amount, tokens[_token][msg.sender]);
+    }
+
+    // Check tokens mapping balances with wrapper function
     function balanceOf(address _token, address _user)
         public
         view

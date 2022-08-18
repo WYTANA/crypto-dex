@@ -70,6 +70,7 @@ contract Token {
         address _to,
         uint256 _value
     ) public returns (bool success) {
+        // console.log(_from, _to, _value);
         require(_from != address(0) && balanceOf[_from] >= _value);
         require(_to != address(0) && allowance[_from][msg.sender] >= _value);
         // Reset allowance
