@@ -6,7 +6,7 @@ const tokens = (n) => {
 }
 
 describe("Exchange", () => {
-  let deployer, feeAccount, exchange, token1
+  let deployer, feeAccount, exchange, token1, token2, accounts, user1, user2
 
   const feePercent = 10
 
@@ -45,7 +45,7 @@ describe("Exchange", () => {
     let transaction, result
     let amount = tokens(10)
 
-    describe("Success", () => {
+    describe("Successfully", () => {
       beforeEach(async () => {
         // 1) Approve the token
         // console.log(user1.address, exchange.address, amount.toString())
@@ -83,8 +83,8 @@ describe("Exchange", () => {
       })
     })
 
-    describe("Failure", () => {
-      it("fails when no tokens are approved", async () => {
+    describe("Fails", () => {
+      it("when no tokens are approved", async () => {
         // No approval
         await expect(
           exchange.connect(user1).depositToken(token1.address, amount)
@@ -97,7 +97,7 @@ describe("Exchange", () => {
     let transaction, result
     let amount = tokens(10)
 
-    describe("Success", () => {
+    describe("Successfully", () => {
       beforeEach(async () => {
         // Deposit tokens before withdrawal
         // 1) Approve the token
@@ -138,8 +138,8 @@ describe("Exchange", () => {
       })
     })
 
-    describe("Failure", () => {
-      it("fails for insufficient balances", async () => {
+    describe("Fails", () => {
+      it("for insufficient balances", async () => {
         // Attempt withdrawal with no deposit
         await expect(
           exchange.connect(user1).withdrawToken(token1.address, amount)
@@ -149,8 +149,9 @@ describe("Exchange", () => {
   })
 
   describe("Checking Balances", () => {
-    let transaction, result
+    let transaction
     let amount = tokens(1)
+    let result
 
     beforeEach(async () => {
       // 1) Approve the token
@@ -174,7 +175,7 @@ describe("Exchange", () => {
     let transaction, result
     let amount = tokens(1)
 
-    describe("Success", async () => {
+    describe("Successfully", async () => {
       beforeEach(async () => {
         // Deposit tokens before making order
         // 1) Approve the token
@@ -212,8 +213,8 @@ describe("Exchange", () => {
         expect(args.timestamp).to.at.least(1)
       })
     })
-    describe("Failure", async () => {
-      it("rejects with no balance", async () => {
+    describe("Fails", async () => {
+      it(" by rejecting with no balance", async () => {
         await expect(
           exchange
             .connect(user1)
@@ -238,7 +239,22 @@ describe("Exchange", () => {
         .connect(user1)
         .depositToken(token1.address, amount)
       result = await transaction.wait()
-      // 3) Make order
+      // 3) Give tokens to user2
+      transaction = await token2
+        .connect(deployer)
+        .transfer(user2.address, tokens(100))
+      result = await transaction.wait()
+      // 4) Approve user2
+      transaction = await token2
+        .connect(user2)
+        .approve(exchange.address, tokens(2))
+      result = await transaction.wait()
+      // 5) Deposit the token
+      transaction = await exchange
+        .connect(user2)
+        .depositToken(token2.address, tokens(2))
+      result = await transaction.wait()
+      // 6) Make order
       transaction = await exchange
         .connect(user1)
         .makeOrder(token2.address, amount, token1.address, amount)
@@ -246,7 +262,7 @@ describe("Exchange", () => {
     })
 
     describe("Cancelling orders", async () => {
-      describe("Success", async () => {
+      describe("Successfully", async () => {
         beforeEach(async () => {
           transaction = await exchange.connect(user1).cancelOrder(1)
           result = await transaction.wait()
@@ -270,7 +286,7 @@ describe("Exchange", () => {
           expect(args.timestamp).to.at.least(1)
         })
       })
-      describe("Failure", async () => {
+      describe("Fails", async () => {
         beforeEach(async () => {
           // 1) Approve the token
           transaction = await token1
@@ -289,15 +305,86 @@ describe("Exchange", () => {
           result = await transaction.wait()
         })
 
-        it("rejects invalid order IDs", async () => {
+        it("by rejecting invalid order IDs", async () => {
           // create invalid order to check
           const invalidOrderId = 99999
           await expect(exchange.connect(user1).cancelOrder(invalidOrderId)).to
             .be.reverted
         })
 
-        it("rejects unauthorized cancellations", async () => {
+        it("by rejecting unauthorized cancellations", async () => {
           await expect(exchange.connect(user2).cancelOrder(1)).to.be.reverted
+        })
+      })
+    })
+
+    describe("Filling orders", async () => {
+      describe("Successfully", () => {
+        beforeEach(async () => {
+          // user 2 fills the order
+          transaction = await exchange.connect(user2).fillOrder("1")
+          result = await transaction.wait()
+        })
+        // Token Give
+        it("executes the trade and charges the fee", async () => {
+          expect(
+            await exchange.balanceOf(token1.address, user1.address)
+          ).to.equal(tokens(0))
+          expect(
+            await exchange.balanceOf(token1.address, user2.address)
+          ).to.equal(tokens(1))
+          expect(
+            await exchange.balanceOf(token1.address, feeAccount.address)
+          ).to.equal(tokens(0))
+          // Token Give
+          expect(
+            await exchange.balanceOf(token2.address, user1.address)
+          ).to.equal(tokens(1))
+          expect(
+            await exchange.balanceOf(token2.address, user2.address)
+          ).to.equal(tokens(0.9))
+          expect(
+            await exchange.balanceOf(token2.address, feeAccount.address)
+          ).to.equal(tokens(0.1))
+        })
+
+        it("updates filled orders", async () => {
+          expect(await exchange.orderFilled(1)).to.equal(true)
+        })
+
+        it("emits a trade event", async () => {
+          const event = result.events[0]
+          expect(event.event).to.equal("Trade")
+
+          const args = event.args
+          expect(args.id).to.equal(1)
+          expect(args.user).to.equal(user2.address)
+          expect(args.tokenGet).to.equal(token2.address)
+          expect(args.amountGet).to.equal(tokens(1))
+          expect(args.tokenGive).to.equal(token1.address)
+          expect(args.amountGive).to.equal(tokens(1))
+          expect(args.creator).to.equal(user1.address)
+          expect(args.timestamp).to.at.least(1)
+        })
+      })
+
+      describe("Fails", () => {
+        it("by rejecting invalid order IDs", async () => {
+          const invalidOrderId = 9999
+          await expect(exchange.connect(user2).fillOrder(invalidOrderId)).to.be
+            .reverted
+        })
+
+        it("by rejecting already filled orders", async () => {
+          transaction = await exchange.connect(user2).fillOrder(1)
+          await transaction.wait()
+          await expect(exchange.connect(user2).fillOrder(1)).to.be.reverted
+        })
+
+        it("by rejecting cancelled orders", async () => {
+          transaction = await exchange.connect(user1).cancelOrder(1)
+          await transaction.wait()
+          await expect(exchange.connect(user2).fillOrder(1)).to.be.reverted
         })
       })
     })
