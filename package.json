@@ -27,7 +27,12 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "exchange": "hardhat test test/Exchange.js",
+    "token": "hardhat test test/Token.js",
+    "deploy/local": "hardhat run --network localhost scripts/1_deploy.js",
+    "deploy/goerli": "hardhat run --network goerli scripts/1_deploy.js",
+    "seed/local": "hardhat run --network localhost scripts/2_seed-exchange.js"
   },
   "eslintConfig": {
     "extends": [
