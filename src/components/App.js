@@ -4,27 +4,27 @@ import config from "../config.json"
 import TOKEN_ABI from "../abis/Token.json"
 import "../App.css"
 
-function App() {
+const App = () => {
   const loadBlockchainData = async () => {
     const accounts = await window.ethereum.request({
       method: "eth_requestAccounts",
     })
-    console.log(accounts[0])
+    console.log("Account:", accounts[0])
 
     // Connect Ethers to blockchain
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const { chainId } = await provider.getNetwork()
-    console.log(chainId)
+    console.log("Chain ID of wallet connection:", chainId)
 
     // Token Smart Contract
     const token = new ethers.Contract(
-      config[chainId].DApp.address,
+      config[chainId].Bdht.address,
       TOKEN_ABI,
       provider
     )
-    console.log(token.address)
+    console.log("Token address:", token.address)
     const symbol = await token.symbol()
-    console.log(symbol)
+    console.log("Token symbol:", symbol)
   }
 
   useEffect(() => {
